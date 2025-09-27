@@ -1,5 +1,7 @@
-import asyncio
 import re
+import asyncio
+import threading
+from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.types import KeyboardButtonUrl
@@ -16,7 +18,22 @@ TARGET_CHANNEL = "@aixauusdbtcusd_trade"
 # --- Replacement Settings ---
 REPLACE_WITH = "@aimanagementteambot"
 
+# --- Flask keep-alive server ---
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+def run_web():
+    app.run(host="0.0.0.0", port=8080)
+
+def keep_alive():
+    t = threading.Thread(target=run_web)
+    t.start()
+
 # --- Create client from session string ---
+# This will also generate a user_session.session file automatically
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 # Utility: clean text
@@ -72,18 +89,23 @@ async def handler(event):
     except Exception as e:
         print(f"⚠️ Error forwarding message {event.id}: {e}")
 
-async def main():
+async def run_bot():
+    # Start client and save session to file
     await client.start()
-    print("🚀 Bot is running 24/7 as a Background Worker...")
+    client.session.save()  # writes user_session.session
+    print("🚀 Bot is running 24/7 on Render Free Web Service...")
     # Warm up the source channel so updates start flowing
     async for msg in client.iter_messages(SOURCE_CHANNEL, limit=1):
         print("🔄 Warmed up channel with last message:", msg.id)
     await client.run_until_disconnected()
 
-if __name__ == "__main__":
-    while True:
-        try:
-            asyncio.run(main())
-        except Exception as e:
-            print(f"💥 Bot crashed with error: {e}. Restarting in 10s...")
-            import time; time.sleep(10)
+# --- Start keep-alive server and bot ---
+keep_alive()
+
+while True:
+    try:
+        asyncio.run(run_bot())
+    except Exception as e:
+        print(f"💥 Bot crashed with error: {e}. Restarting in 10s...")
+        import time; time.sleep(10)
+
